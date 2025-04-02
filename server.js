@@ -14,7 +14,7 @@ app.use(express.static(path.join(__dirname)));
 const dbConfig = {
   host:
     process.env.RDS_HOSTNAME ||
-    "hancom.cv88qo4gg15o.ap-northeast-2.rds.amazonaws.com",
+    "hancom2.cv88qo4gg15o.ap-northeast-2.rds.amazonaws.com",
   user: process.env.RDS_USERNAME || "admin",
   password: process.env.RDS_PASSWORD || "lds*13041226",
   database: process.env.RDS_DB_NAME || "memodb",
