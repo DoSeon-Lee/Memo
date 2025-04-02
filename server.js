@@ -18,7 +18,6 @@ const dbConfig = {
   user: process.env.RDS_USERNAME || "admin",
   password: process.env.RDS_PASSWORD || "lds*13041226",
   database: process.env.RDS_DB_NAME || "memodb",
-  port: process.env.RDS_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
