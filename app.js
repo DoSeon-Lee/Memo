@@ -37,6 +37,18 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
+// 포맷팅된 날짜 가져오기
+function getFormattedDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
 // 메모 목록 로드
 async function loadMemos() {
   try {
@@ -47,7 +59,10 @@ async function loadMemos() {
     renderMemoList(memos);
   } catch (error) {
     console.error("메모 목록 로드 오류:", error);
-    alert("메모 목록을 불러오는데 실패했습니다.");
+
+    // API 연결 실패 시 로컬 스토리지에서 로드
+    const storedMemos = JSON.parse(localStorage.getItem("memos") || "[]");
+    renderMemoList(storedMemos);
   }
 }
 
@@ -56,7 +71,8 @@ function renderMemoList(memos) {
   memoList.innerHTML = "";
 
   if (memos.length === 0) {
-    memoList.innerHTML = '<li class="no-memos">저장된 메모가 없습니다.</li>';
+    memoList.innerHTML =
+      '<li class="no-memos"><i class="fas fa-info-circle"></i> 저장된 메모가 없습니다.</li>';
     return;
   }
 
@@ -70,14 +86,24 @@ function renderMemoList(memos) {
         ? memo.content.substring(0, 100) + "..."
         : memo.content;
 
+    // 메모 작성 날짜 표시
+    const date = memo.date || getFormattedDate();
+
     li.innerHTML = `
       <div class="memo-content">
-        <div class="memo-title">${escapeHtml(memo.title)}</div>
+        <div class="memo-title"><i class="fas fa-file-alt"></i> ${escapeHtml(
+          memo.title
+        )}</div>
         <div class="memo-text">${escapeHtml(previewText)}</div>
+        <div class="memo-date"><i class="fas fa-clock"></i> ${date}</div>
       </div>
       <div class="memo-actions">
-        <button class="edit-btn" data-id="${memo.id}">수정</button>
-        <button class="delete-btn" data-id="${memo.id}">삭제</button>
+        <button class="edit-btn" data-id="${
+          memo.id
+        }"><i class="fas fa-edit"></i></button>
+        <button class="delete-btn" data-id="${
+          memo.id
+        }"><i class="fas fa-trash-alt"></i></button>
       </div>
     `;
 
@@ -91,6 +117,11 @@ function renderMemoList(memos) {
     li.querySelector(".delete-btn").addEventListener("click", (e) => {
       e.stopPropagation();
       deleteMemo(memo.id);
+    });
+
+    // 메모 항목 클릭 이벤트 - 전체 상세 내용 보기
+    li.addEventListener("click", () => {
+      showEditForm(memo);
     });
 
     memoList.appendChild(li);
@@ -107,13 +138,20 @@ async function createMemo() {
     return;
   }
 
+  const newMemo = {
+    id: Date.now().toString(),
+    title,
+    content,
+    date: getFormattedDate(),
+  };
+
   try {
     const response = await fetch("/api/memos", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify(newMemo),
     });
 
     if (!response.ok) throw new Error("메모 저장에 실패했습니다.");
@@ -126,7 +164,18 @@ async function createMemo() {
     loadMemos();
   } catch (error) {
     console.error("메모 저장 오류:", error);
-    alert("메모 저장에 실패했습니다.");
+
+    // API 연결 실패 시 로컬 스토리지에 저장
+    const storedMemos = JSON.parse(localStorage.getItem("memos") || "[]");
+    storedMemos.push(newMemo);
+    localStorage.setItem("memos", JSON.stringify(storedMemos));
+
+    // 입력 필드 초기화
+    memoTitle.value = "";
+    memoContent.value = "";
+
+    // 메모 목록 새로고침
+    renderMemoList(storedMemos);
   }
 }
 
@@ -138,6 +187,9 @@ function showEditForm(memo) {
 
   memoForm.classList.add("hidden");
   memoEdit.classList.remove("hidden");
+
+  // 스크롤을 수정 폼으로 이동
+  memoEdit.scrollIntoView({ behavior: "smooth" });
 }
 
 // 메모 수정 취소
@@ -148,6 +200,9 @@ function cancelEdit() {
 
   memoForm.classList.remove("hidden");
   memoEdit.classList.add("hidden");
+
+  // 스크롤을 상단으로 이동
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // 메모 업데이트
@@ -162,13 +217,20 @@ async function updateMemo() {
     return;
   }
 
+  const updatedMemo = {
+    id: currentMemoId,
+    title,
+    content,
+    date: getFormattedDate(),
+  };
+
   try {
     const response = await fetch(`/api/memos/${currentMemoId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify(updatedMemo),
     });
 
     if (!response.ok) throw new Error("메모 수정에 실패했습니다.");
@@ -180,7 +242,19 @@ async function updateMemo() {
     loadMemos();
   } catch (error) {
     console.error("메모 수정 오류:", error);
-    alert("메모 수정에 실패했습니다.");
+
+    // API 연결 실패 시 로컬 스토리지에서 수정
+    const storedMemos = JSON.parse(localStorage.getItem("memos") || "[]");
+    const updatedMemos = storedMemos.map((memo) =>
+      memo.id === currentMemoId ? updatedMemo : memo
+    );
+    localStorage.setItem("memos", JSON.stringify(updatedMemos));
+
+    // 수정 폼 숨기기
+    cancelEdit();
+
+    // 메모 목록 새로고침
+    renderMemoList(updatedMemos);
   }
 }
 
@@ -199,6 +273,13 @@ async function deleteMemo(id) {
     loadMemos();
   } catch (error) {
     console.error("메모 삭제 오류:", error);
-    alert("메모 삭제에 실패했습니다.");
+
+    // API 연결 실패 시 로컬 스토리지에서 삭제
+    const storedMemos = JSON.parse(localStorage.getItem("memos") || "[]");
+    const updatedMemos = storedMemos.filter((memo) => memo.id !== id);
+    localStorage.setItem("memos", JSON.stringify(updatedMemos));
+
+    // 메모 목록 새로고침
+    renderMemoList(updatedMemos);
   }
 }
